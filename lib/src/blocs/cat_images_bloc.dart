@@ -1,84 +1,83 @@
 import 'dart:async';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+
 import 'package:rxdart/rxdart.dart';
 
+import 'cat_images_event.dart';
+import 'cat_images_state.dart';
+import '../resources/repository.dart';
 import '../models/cat_image.dart';
+import '../models/cat_breed_model.dart';
 
 class CatImagesBloc {
-  final _catImagesSubject = BehaviorSubject<List<CatImage>>();
-  final _filteredCatImagesSubject = BehaviorSubject<List<CatImage>>();
+  final Repository _repository;
+
+  final _imageStateSubject = BehaviorSubject<CatImagesState>();
   final _loadingSubject = BehaviorSubject<bool>();
+
+  Stream<CatImagesState> get stateStream => _imageStateSubject.stream;
+  final _eventController = StreamController<CatImagesEvent>();
+  Sink<CatImagesEvent> get eventSink => _eventController.sink;
 
   List<CatImage> _allCatImages = [];
 
-  Stream<List<CatImage>> get catImagesStream =>
-      _filteredCatImagesSubject.stream;
+  CatImagesBloc(this._repository) {
+    _eventController.stream.listen((event) async {
+      await onEvent(event);
+    });
+  }
 
-  Stream<bool> get loadingStream => _loadingSubject.stream;
+  Future<void> onEvent(CatImagesEvent event) async {
+    if (event is LoadCatImages) {
+      await _loadCatImages();
+    } else if (event is FilterCatImages) {
+      filterCatImages(event.query);
+    }
+  }
 
-  Future<void> loadCatImages() async {
-    _loadingSubject.add(true);
+  Future<void> _loadCatImages() async {
+    _imageStateSubject.add(CatImagesLoading());
 
     try {
-      final breedsResponse =
-          await http.get(Uri.parse('https://api.thecatapi.com/v1/breeds'));
+      final List<CatBreedModel> catBreeds = await _repository.fetchAllCats();
 
-      if (breedsResponse.statusCode == 200) {
-        List<dynamic> imagesData = json.decode(breedsResponse.body);
+      List<String> imageIds = catBreeds
+          .map((breed) => breed.referenceImageId)
+          .where((id) => id != null && id != "")
+          .cast<String>()
+          .toList();
 
-        List<String> imageIds = imagesData
-            .map((image) => image['reference_image_id'] as String?)
-            .where((id) => id != null)
-            .cast<String>()
-            .toList();
+      List<CatImage> catDetailsList = [];
 
-        List<CatImage> catDetailsList = [];
-
-        for (String id in imageIds) {
-          final detailsResponse = await http
-              .get(Uri.parse('https://api.thecatapi.com/v1/images/$id'));
-
-          if (detailsResponse.statusCode == 200) {
-            final detailsData = json.decode(detailsResponse.body);
-            final catDetails = CatImage.fromJson(detailsData);
-            catDetailsList.add(catDetails);
-          } else {
-            throw Exception('Failed to load cat details for id: $id');
-          }
-        }
-
-        _allCatImages = catDetailsList;
-        _catImagesSubject.add(_allCatImages);
-        _filteredCatImagesSubject.add(_allCatImages);
-      } else {
-        throw Exception('Failed to load cat images');
+      for (String id in imageIds) {
+        final CatImage catDetails = await _repository.fetchCatImageDetails(id);
+        catDetailsList.add(catDetails);
       }
-    } catch (e) {
-      _catImagesSubject.addError('An error occurred: $e');
-    }
 
-    _loadingSubject.add(false);
+      _imageStateSubject.add(CatImagesLoaded(catDetailsList));
+
+      _allCatImages = catDetailsList;
+    } catch (e) {
+      _imageStateSubject.add(CatImagesError('An error occurred: $e'));
+    }
   }
 
   void filterCatImages(String query) {
+    List<CatImage> filteredList;
     if (query.isEmpty) {
-      _filteredCatImagesSubject.add(_allCatImages);
+      filteredList = _allCatImages;
     } else {
-      final filteredList = _allCatImages
+      filteredList = _allCatImages
           .where((catImage) =>
               catImage.breeds!.isNotEmpty &&
               catImage.breeds![0].name
                   .toLowerCase()
                   .contains(query.toLowerCase()))
           .toList();
-
-      _filteredCatImagesSubject.add(filteredList);
     }
+    _imageStateSubject.add(CatImagesLoaded(filteredList));
   }
 
   void dispose() {
-    _catImagesSubject.close();
     _loadingSubject.close();
   }
 }

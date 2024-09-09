@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../blocs/cat_images_bloc.dart';
+import '../blocs/cat_images_event.dart';
+import '../blocs/cat_images_state.dart';
 import '../models/cat_image.dart';
 import 'cat_detail_page.dart';
 
@@ -16,11 +19,11 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _catImagesBloc = CatImagesBloc();
-    _catImagesBloc.loadCatImages();
+    _catImagesBloc = Provider.of<CatImagesBloc>(context, listen: false);
+    _catImagesBloc.onEvent(LoadCatImages());
 
     _searchController.addListener(() {
-      _catImagesBloc.filterCatImages(_searchController.text);
+      _catImagesBloc.eventSink.add(FilterCatImages(_searchController.text));
     });
   }
 
@@ -51,32 +54,26 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-          StreamBuilder<bool>(
-            stream: _catImagesBloc.loadingStream,
+          StreamBuilder<CatImagesState>(
+            stream: _catImagesBloc.stateStream,
             builder: (context, snapshot) {
-              if (snapshot.hasData && snapshot.data!) {
-                return LinearProgressIndicator();
-              }
-              return SizedBox.shrink();
-            },
-          ),
-          Expanded(
-            child: StreamBuilder<List<CatImage>>(
-              stream: _catImagesBloc.catImagesStream,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text('No cat images available'));
-                }
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              } else if (snapshot.hasError || snapshot.data is CatImagesError) {
+                final error = snapshot.error ?? 'An error occurred';
+                return Center(child: Text('Error: $error'));
+              } else if (snapshot.data is CatImagesLoading) {
+                return const LinearProgressIndicator();
+              } else if (snapshot.data is CatImagesLoaded) {
+                final state = snapshot.data as CatImagesLoaded;
+                final catImages = state.images;
 
-                final catImages = snapshot.data!;
-                return buildIMage(catImages);
-              },
-            ),
-          ),
+                return Expanded(child: buildIMage(catImages));
+              }
+
+              return const Center(child: Text('No cat images available'));
+            },
+          )
         ],
       ),
     );

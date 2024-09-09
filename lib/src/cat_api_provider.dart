@@ -5,7 +5,7 @@ import 'models/cat_breed_model.dart';
 import 'models/cat_image.dart';
 
 class CatApiProvider {
-  final _baseUrl = "https://api.thecatapi.com/v1/breeds";
+  final _baseUrl = "https://api.thecatapi.com/v1";
   final String _apiKey =
       "ive_99Qe4Ppj34NdplyLW67xCV7Ds0oSLKGgcWWYnSzMJY9C0QOu0HUR4azYxWkyW2nr";
   Client client = Client();
