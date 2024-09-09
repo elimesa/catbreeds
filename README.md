@@ -30,13 +30,13 @@ The **Cat Breeds App** allows users to view cat images and obtain detailed infor
    flutter run
 
 ## Project Structure
-   lib/
-   blocs/: Business logic components using the BLoC pattern.
-   models/: Data models for cat breeds and images.
-   providers/: API provider handling HTTP requests.
-   repositories/: Interacts with providers to handle data access logic.
-   screens/: Application screens (list, detail views).
-   widgets/: Reusable UI components. 
+      lib/
+      blocs/: Business logic components using the BLoC pattern.
+      models/: Data models for cat breeds and images.
+      providers/: API provider handling HTTP requests.
+      repositories/: Interacts with providers to handle data access logic.
+      screens/: Application screens (list, detail views).
+      widgets/: Reusable UI components. 
 ## Dependencies
 ## Key dependencies used in this project:
     Flutter (>=2.0.0)
